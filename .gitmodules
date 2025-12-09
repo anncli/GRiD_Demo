@@ -1,0 +1,4 @@
+[submodule "GRiD"]
+	path = GRiD
+	url = https://github.com/A2R-Lab/GRiD.git
+	branch = ann/python_bindings
