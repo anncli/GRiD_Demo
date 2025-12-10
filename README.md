@@ -14,7 +14,7 @@ GRiD is a library of functions that computes physics quantities needed for traje
 An example of this use case can be found in the implementation of KKT systems solvers in [MPCGPU](https://github.com/A2R-Lab/MPCGPU/tree/0efde8c63c38465bba630ba569c4f8a30c1b009c).
 
 ## Installation
-This package contains submodules! Make sure to run `git submodule update --init --recursive` after cloning.
+This package contains several layers of submodules! Make sure to run `git submodule update --init --recursive` after cloning.
 
 ### Building GRiD Python
 
