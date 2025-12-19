@@ -1,6 +1,6 @@
 """
 This is a basic demo using GRiD Python to simulate moving the front left
-HFE (hip flexion extension) joint of a HyQ quadruped robot using inverse
+HFE (hip flexion/extension) joint of a HyQ quadruped robot using inverse
 and forward dynamics with a basic PD controller.
 """
 
