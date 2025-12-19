@@ -1,6 +1,7 @@
 """
-This is a basic demo using GRiD Python to simulate the trajectory of a HyQ Qudraped's
-joint and end effector positions under a sinusoidal torque input.
+This is a basic demo using GRiD Python to simulate moving the front left
+HFE (hip flexion extension) joint of a HyQ quadruped robot using inverse
+and forward dynamics with a basic PD controller.
 """
 
 import numpy as np
@@ -26,91 +27,119 @@ def suppress_stdout_stderr():
             os.dup2(old_stderr, 2)
 
 
-def simulate_simple_trajectory(dt=0.001, T=1.0):
-    print("Running GRiD Hello World Trajectory Demo...\n")
+# DEMO CONFIGS
+dt = 0.01    # time steps
+T  = 1.0     # total time
 
-    nj = gridCuda.NUM_JOINTS   # number of joints in the robot model
-    steps = int(T / dt)        # number of simulation timesteps
+Kp = 150.0   # PD contoller proportional gain
+Kd = 30.0    # PD controller derivative gain
 
-    # ----------------------------------------------------
-    # 1. INITIAL CONDITIONS
-    # ----------------------------------------------------
-    q  = np.zeros(nj, dtype=np.float32)   # joint positions    q(t)
-    qd = np.zeros(nj, dtype=np.float32)   # joint velocities   q̇(t)
-    u  = np.zeros(nj, dtype=np.float32)   # joint torques      τ(t)
+LF_HFE = 1   # URDF Joint ID
 
-    history = []   # to record q₀(t) over time
-    ee_history = []  # to record end-effector positions over time
+def computed_torque_demo():
+    nj = gridCuda.NUM_JOINTS
+    steps = int(T / dt)
 
-    # ----------------------------------------------------
-    # 2. SIMULATION LOOP
-    # ----------------------------------------------------
-    for i in range(steps):
-        t = i * dt
+    q  = np.zeros(nj, dtype=np.float32)
+    qd = np.zeros(nj, dtype=np.float32)
 
-        # ------------------------------------------------
-        # 2a. CONTROL INPUT (u): torque applied
-        #     Apply a sinusoidal torque on joint 0 (LF_HAA)
-        # ------------------------------------------------
-        u[0] = 2.0 * np.sin(2 * np.pi * t)
+    q_des  = np.zeros(nj, dtype=np.float32)
+    qd_des = np.zeros(nj, dtype=np.float32)
 
-        # ------------------------------------------------
-        # 2b. PHYSICS COMPUTATION (q̈ = f(q, q̇, u))
-        #     Create a GRiD data object for this timestep
-        # ------------------------------------------------
-        grid = gridCuda.GRidDataFloat(q, qd, u)
+    q_des[LF_HFE] = 0.4  # desired target position for LF_HFE joint
+
+    # For logging
+    q_hist = []
+    tau_hist = []
+    qdd_des_hist = []
+    qdd_hist = []
+
+    print("Running demo...")
+    print(f"Target HFE angle: {q_des[LF_HFE]:.3f} rad")
+
+    for _ in range(steps):
+        # 1. Find required acceleration to reach target
+        qdd_des = (
+            Kp * (q_des - q) +
+            Kd * (qd_des - qd)
+        ).astype(np.float32)
+
+        # 2. Find torque needed for acceleration considering mass, gravity, and inertia
+        # 2a. Bias forces (C + g)
+        grid = gridCuda.GRidDataFloat(q, qd, np.zeros(nj, dtype=np.float32))
         with suppress_stdout_stderr():
-            qdd = grid.forward_dynamics() # GRiD → q̈(t)
+            bias = grid.inverse_dynamics()
 
+        # 2b. Mass matrix inverse to solve for required torques
         with suppress_stdout_stderr():
-            ee = grid.get_end_effector_positions()   # shape (6, Nees)
-        xyz = ee[:3]   # position of left foot end effector
+            Minv = grid.minv()
 
-        # ------------------------------------------------
-        # 2c. INTEGRATION (Euler)
-        #     Integrate q̇ and q using q̈ from GRiD
-        #     This is the state-transition function
-        # ------------------------------------------------
-        qd += qdd * dt                    # velocity update
-        q  += qd  * dt                    # position update
+        # 2c. Compute total torque
+        tau = bias + np.linalg.solve(Minv, qdd_des)
 
-        # ------------------------------------------------
-        # 2d. LOGGING
-        # ------------------------------------------------
-        history.append(q[1])              # record joint 1 (LF_HFE) position
-        ee_history.append(xyz.copy())     # record LF end-effector position
+        # 3. Forward dynamics (simulating physics) using computed torque
+        grid = gridCuda.GRidDataFloat(q, qd, tau)
+        with suppress_stdout_stderr():
+            qdd = grid.forward_dynamics()
 
-    #print("\nFinal joint position:", q[0])
-    return np.array(history), np.array(ee_history)
+        # 4. Update joint states with Euler integration
+        qd += qdd * dt
+        q  += qd  * dt
+
+        # 5. Log LF_HFE joint values for plotting
+        q_hist.append(q[LF_HFE])
+        tau_hist.append(tau[LF_HFE])
+        qdd_des_hist.append(qdd_des[LF_HFE])
+        qdd_hist.append(qdd[LF_HFE])
+
+    print(f"Final LF_HFE angle: {q[LF_HFE]:.3f} rad")
+    print(f"Final error: {(q_des[LF_HFE] - q[LF_HFE]):.3f} rad")
+    return np.array(q_hist), np.array(tau_hist), np.array(qdd_des_hist), np.array(qdd_hist), q_des[LF_HFE]
 
 
 if __name__ == "__main__":
-    traj, ee_traj = simulate_simple_trajectory()
+    q_hist, tau_hist, qdd_des_hist, qdd_hist, q_des = computed_torque_demo()
+    t = np.linspace(0, T, len(q_hist))
 
-    # Time axis
-    dt = 0.001
-    steps = len(traj)
-    T = dt * steps
-    t = np.linspace(0, T, steps)
+    PLOTS_DIRECTORY = "plots"
+    if not os.path.exists(PLOTS_DIRECTORY):
+        os.makedirs(PLOTS_DIRECTORY)
 
-    # Plot trajectory of the joint
-    plt.figure(figsize=(8,4))
-    plt.plot(t, traj, linewidth=2)
-    plt.title("Joint 1 Position Over Time")
+    # Joint angle over time
+    plt.figure()
+    plt.plot(t, q_hist, label="actual")
+    plt.axhline(q_des, linestyle="--", label="target")
+    plt.title("LF_HFE Joint Angle")
     plt.xlabel("Time (s)")
-    plt.ylabel("Position (rad)")
-    plt.grid(True)
-    plt.savefig("trajectory1.png")
-    print("Saved plot to trajectory1.png")
-
-    plt.figure(figsize=(8,4))
-    plt.plot(t, ee_traj[:,0], label="X")
-    plt.plot(t, ee_traj[:,1], label="Y")
-    plt.plot(t, ee_traj[:,2], label="Z")
-    plt.title("End Effector Position Over Time")
-    plt.xlabel("Time (s)")
-    plt.ylabel("Position (m)")
-    plt.grid(True)
+    plt.ylabel("rad")
     plt.legend()
-    plt.savefig("end_effector_xyz.png")
-    print("Saved plot to end_effector_xyz.png")
+    plt.grid()
+    plt.savefig(f"{PLOTS_DIRECTORY}/lf_hfe_angle.png", dpi=150)
+    plt.close()
+
+    # Torque over time
+    plt.figure()
+    plt.plot(t, tau_hist)
+    plt.title("LF_HFE Torque")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Nm")
+    plt.grid()
+    plt.savefig(f"{PLOTS_DIRECTORY}/lf_hfe_torque.png", dpi=150)
+    plt.close()
+
+    # Desired vs. actual acceleration over time
+    plt.figure()
+    plt.plot(t, qdd_des_hist, label="desired")
+    plt.plot(t, qdd_hist, linestyle="--", label="actual")
+    plt.title("LF_HFE Acceleration Tracking")
+    plt.xlabel("Time (s)")
+    plt.ylabel("rad/s²")
+    plt.legend()
+    plt.grid()
+    plt.savefig(f"{PLOTS_DIRECTORY}/lf_hfe_accel_tracking.png", dpi=150)
+    plt.close()
+
+    print(f"Saved plots to {PLOTS_DIRECTORY} directory:")
+    print(" - lf_hfe_angle.png")
+    print(" - lf_hfe_torque.png")
+    print(" - lf_hfe_accel_tracking.png")
