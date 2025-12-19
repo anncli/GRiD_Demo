@@ -36,30 +36,16 @@ To test the installation of the GRiD bindings, run:
 The demo simulates the motion of the front-left HFE (hip flexion/extension) joint of the [HyQ quadruped robot](https://iit-dlslab.github.io/papers/khan15phd.pdf) (see pages 83-85). Specifically, it:
 1. Defines a target joint angle for the HFE joint.
 2. Uses a simple PD controller to compute required joint accelerations.
-3. Uses inverse dynamics to compute the motor torque required to achieve that acceleration, accounting for gravity and other bias.
+3. Uses inverse dynamics to compute the motor torque required to achieve that acceleration, accounting for gravity and other biases.
 4. Uses forward dynamics to simulate how the robot responds to that torque.
 5. Integrates joint accelerations over time to update joint velocities and positions.
 6. Plots joint motion and other control values for visualization.
 
-These steps are repeated in a loop to move the joint to the desired angle and hold it there for a specified number of simulation time step.
-
-### Control structure
-
-The control loop implemented in the demo follows this structure:
-1. define position error and velocity error
-2. PD controller
-3. desired acceleration
-4. inverse dynamics
-5. torque
-6. forward dynamics
-7. joint acceleration
-8. Euler integration
-
-This approach is commonly referred to as *computed-torque control*.
+These steps are repeated in a loop to move the joint to the desired angle and hold it there for a specified number of simulation time steps. This approach is commonly referred to as *computed-torque control*.
 
 ### Generated plots
 
-When the demo is run, several plots are saved as PNG files in the plots directory.
+Several graphs are saved as PNG files in the plots folder as part of the demo.
 
 #### 1. Joint angle over time (`lf_hfe_angle.png`)
 
@@ -81,7 +67,7 @@ This plot illustrates:
 - The large initial torque needed to accelerate the leg
 - The steady torque required to hold the joint against gravity once it reaches the target
 
-#### 3. Desired vs. actual acceleration (lf_hfe_accel_tracking.png)
+#### 3. Desired vs. actual acceleration (`lf_hfe_accel_tracking.png`)
 
 This plot compares:
 - The desired/ideal joint acceleration computed by the PD controller
@@ -90,7 +76,7 @@ This plot compares:
 This plot demonstrates:
 - How closely the robot follows the commanded acceleration
 - The effect of inertia, gravity, and coupling on the system response
-- Good overlap between the curves indicates that inverse and forward dynamics are consistent
+- Good overlap between the curves indicates inverse and forward dynamics are consistent
 
 ## API Reference
 [Full API Reference and Documentation](#api-reference)
