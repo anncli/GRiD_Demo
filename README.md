@@ -16,6 +16,8 @@ An example of this use case can be found in the implementation of KKT systems so
 ## Installation and Usage
 This package contains several layers of submodules! Make sure to run `git submodule update --init --recursive` after cloning.
 
+**Note:** GRiD's dependencies are not be automatically installed. Make sure to follow the submodule's README to install any additional dependencies for GRiD.
+
 ### Building GRiD Python
 
     pip install GRiD/bindings
