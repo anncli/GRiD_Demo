@@ -26,7 +26,7 @@ This package contains several layers of submodules! Make sure to run `git submod
 To use the GRiD Python in your project, include `from GRiD.bindings import gridCuda` at the top of your file.
 
 ## Demo
-To test that you have installed the GRiD bindings correct, run:
+To test the installation of the GRiD bindings, run:
 
     python hello_grid.py
 
